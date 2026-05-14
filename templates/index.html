@@ -1,0 +1,42 @@
+{% extends "layout_app.html" %}
+{% block title %}工作台 - 基于Pcap的网络流量分析平台{% endblock %}
+{% block topbar_title %}文件上传与分析{% endblock %}
+{% block sidebar_nav %}
+{% include "partials/workbench_nav.html" %}
+{% endblock %}
+{% block sidebar_footer %}
+<span>上传 pcap/cap 后自动跳转分析结果页</span>
+{% endblock %}
+{% block content %}
+<div class="glass-card mb-4">
+  <div class="card-body p-4">
+    <h5 class="fw-bold text-dark mb-3">上传数据包文件</h5>
+    <p class="text-secondary small mb-3">支持 .pcap / .cap，单文件不超过 50MB。解析完成后将进入多模块分析视图。</p>
+    <form id="uploadForm">
+      <input type="file" class="form-control mb-3" id="pcapFile" accept=".pcap,.cap" required>
+      <button class="btn btn-primary px-4" type="submit">开始分析</button>
+      <span id="tip" class="ms-3 text-secondary fw-semibold small"></span>
+    </form>
+  </div>
+</div>
+
+<script>
+  const form = document.getElementById("uploadForm");
+  const tip = document.getElementById("tip");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const file = document.getElementById("pcapFile").files[0];
+    if (!file) return;
+    tip.textContent = "分析中，请稍候...";
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      tip.textContent = data.message || "上传失败";
+      return;
+    }
+    window.location.href = data.redirect;
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,6 @@
+<div class="nav-label">工作台</div>
+<a class="{{ 'active' if nav_active == 'upload' else '' }}" href="{{ url_for('index') }}"><span>📁</span> 文件上传与分析</a>
+<a class="{{ 'active' if nav_active == 'history' else '' }}" href="{{ url_for('analysis_history') }}"><span>📋</span> 最近分析记录</a>
+{% if is_superuser %}
+<a class="{{ 'active' if nav_active == 'users' else '' }}" href="{{ url_for('user_management') }}"><span>👥</span> 用户管理</a>
+{% endif %}

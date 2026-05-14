@@ -1,0 +1,411 @@
+{% extends "layout_app.html" %}
+{% block title %}分析结果 - {{ capture.filename }}{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+{% endblock %}
+{% block topbar_title %}分析结果 · {{ capture.filename }}{% endblock %}
+{% block topbar_extra %}
+<a class="btn btn-sm btn-outline-secondary" href="{{ url_for('index') }}">返回首页</a>
+<a class="btn btn-sm btn-primary" href="{{ url_for('export_pdf', file_uuid=capture.file_uuid) }}">导出 PDF</a>
+{% endblock %}
+{% block sidebar_nav %}
+<div class="nav-label">分析模块</div>
+<button type="button" class="nav-item-btn active" data-module="overview"><span>📊</span> 概览总览</button>
+<button type="button" class="nav-item-btn" data-module="protocol"><span>🥧</span> 协议分布分析</button>
+<button type="button" class="nav-item-btn" data-module="timeline"><span>📈</span> 流量时序分析</button>
+<button type="button" class="nav-item-btn" data-module="ip"><span>🌐</span> 会话与 IP 分析</button>
+<button type="button" class="nav-item-btn" data-module="security"><span>🛡️</span> 安全告警分析</button>
+{% endblock %}
+{% block sidebar_footer %}
+<span class="text-truncate d-block" title="{{ capture.file_uuid }}">当前文件 UUID：{{ capture.file_uuid[:8] }}…</span>
+{% endblock %}
+
+{% block content %}
+
+<div id="panel-overview" class="module-panel active">
+  <div class="glass-card mb-4">
+    <div class="card-body p-4">
+      <h5 class="fw-bold text-dark mb-2">文件信息</h5>
+      <p class="mb-1"><strong>原始文件名：</strong>{{ capture.filename }}</p>
+      <p class="mb-1"><strong>存储标识：</strong><code class="small">{{ capture.file_uuid }}</code></p>
+      <p class="mb-0 text-secondary small">以下为核心统计指标与敏感信息、数据包预览，便于快速把握整包概况。</p>
+    </div>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-md-3 col-sm-6"><div class="metric metric-blue"><h6>数据包数量</h6><h3>{{ packet_count }}</h3></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric metric-cyan"><h6>会话数量</h6><h3>{{ session_count }}</h3></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric metric-emerald"><h6>敏感信息命中</h6><h3>{{ sensitive_count }}</h3></div></div>
+    <div class="col-md-3 col-sm-6"><div class="metric metric-rose"><h6>攻击告警数</h6><h3>{{ attack_count }}</h3></div></div>
+  </div>
+  <div class="glass-card mb-4">
+    <div class="card-header">敏感信息命中（最近 20 条）</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>类型</th><th>内容</th><th>时间</th></tr></thead>
+          <tbody>
+          {% for s in sensitive_items %}
+            <tr><td>{{ s.info_type }}</td><td><code>{{ s.info_value }}</code></td><td>{{ s.created_at }}</td></tr>
+          {% else %}
+            <tr><td colspan="3" class="text-secondary">暂无</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card">
+    <div class="card-header">数据包预览（前 100 条）</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-striped table-sm mb-0">
+          <thead><tr><th>#</th><th>时间</th><th>源 IP</th><th>目标 IP</th><th>协议</th><th>长度</th></tr></thead>
+          <tbody>
+          {% for p in recent_packets %}
+            <tr>
+              <td>{{ p.packet_num }}</td>
+              <td>{{ p.time or "-" }}</td>
+              <td>{{ p.src_ip or "-" }}</td>
+              <td>{{ p.dst_ip or "-" }}</td>
+              <td>{{ p.protocol_name or "-" }}</td>
+              <td>{{ p.length }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-secondary">暂无数据</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-protocol" class="module-panel">
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="glass-card h-100">
+        <div class="card-header">协议分布（饼图）</div>
+        <div class="card-body"><div id="protocolChart" style="height:360px;"></div></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="glass-card h-100">
+        <div class="card-header">各协议占比统计</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0" id="protocolStatsTable">
+              <thead><tr><th>协议</th><th>包数</th><th>占比</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card">
+    <div class="card-header">协议使用明细（按包序号抽样展示）</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>#</th><th>时间</th><th>源 IP</th><th>目标 IP</th><th>协议</th><th>长度</th></tr></thead>
+          <tbody>
+          {% for p in recent_packets %}
+            <tr>
+              <td>{{ p.packet_num }}</td>
+              <td>{{ p.time or "-" }}</td>
+              <td>{{ p.src_ip or "-" }}</td>
+              <td>{{ p.dst_ip or "-" }}</td>
+              <td><span class="badge text-bg-light border">{{ p.protocol_name or "-" }}</span></td>
+              <td>{{ p.length }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-secondary">暂无</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-timeline" class="module-panel">
+  <div class="glass-card mb-3">
+    <div class="card-header">时间序列流量（折线）· 峰值 / 低谷标注</div>
+    <div class="card-body"><div id="timelineChart" style="height:340px;"></div></div>
+  </div>
+  <div class="glass-card">
+    <div class="card-header">会话时间分布（按小时统计包数量）</div>
+    <div class="card-body"><div id="sessionHourChart" style="height:300px;"></div></div>
+  </div>
+</div>
+
+<div id="panel-ip" class="module-panel">
+  <div class="row g-3 mb-3">
+    <div class="col-lg-5">
+      <div class="glass-card h-100">
+        <div class="card-header">Top IP 排行与流量占比</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead><tr><th>IP</th><th>出现次数</th><th>占比</th></tr></thead>
+              <tbody>
+              {% for row in top_ips %}
+                <tr>
+                  <td><code>{{ row.ip }}</code></td>
+                  <td>{{ row.count }}</td>
+                  <td>{{ row.ratio }}%</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="3" class="text-secondary">暂无</td></tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="glass-card h-100">
+        <div class="card-header">IP 间通信关系（Top 链路与强度）</div>
+        <div class="card-body"><div id="ipGraphChart" style="height:360px;"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card">
+    <div class="card-header">IP 会话详情（TCP 载荷会话，最近 40 条）</div>
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>协议</th><th>源</th><th>目标</th><th>端口</th><th>摘要</th></tr></thead>
+          <tbody>
+          {% for s in sessions_preview %}
+            <tr>
+              <td>{{ s.protocol }}</td>
+              <td><code>{{ s.src_ip or "-" }}</code></td>
+              <td><code>{{ s.dst_ip or "-" }}</code></td>
+              <td>{{ s.src_port }} → {{ s.dst_port }}</td>
+              <td class="text-truncate" style="max-width:280px" title="{{ (s.content or '')[:500] }}">{{ (s.content or '')[:80] }}{% if s.content and s.content|length > 80 %}…{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-secondary">无 TCP 会话或未解析到载荷</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card mt-3">
+    <div class="card-header">通信对明细（按包计数）</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>源 IP</th><th>目标 IP</th><th>包数</th><th>占全部通信对比例</th></tr></thead>
+          <tbody>
+          {% for e in ip_pairs %}
+            <tr>
+              <td><code>{{ e.src_ip }}</code></td>
+              <td><code>{{ e.dst_ip }}</code></td>
+              <td>{{ e.count }}</td>
+              <td>{{ e.ratio }}%</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-secondary">暂无</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="panel-security" class="module-panel">
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="glass-card h-100">
+        <div class="card-header">告警类型统计</div>
+        <div class="card-body"><div id="attackTypeChart" style="height:280px;"></div></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="glass-card h-100">
+        <div class="card-header">风险等级分布</div>
+        <div class="card-body"><div id="attackRiskChart" style="height:280px;"></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="glass-card">
+    <div class="card-header">攻击告警列表与详情</div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 align-middle">
+          <thead><tr><th>类型</th><th>风险</th><th>源地址</th><th>时间</th><th>详情</th></tr></thead>
+          <tbody>
+          {% for a in attack_preview %}
+            <tr>
+              <td>{{ a.attack_type }}</td>
+              <td>
+                {% if a.attack_type in ['SQL Injection', 'Directory Traversal'] %}
+                  <span class="badge text-bg-danger">高</span>
+                {% elif a.attack_type == 'Weak Credential Exposure' %}
+                  <span class="badge text-bg-warning text-dark">中</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">低</span>
+                {% endif %}
+              </td>
+              <td><code>{{ a.suspicious_address or "-" }}</code></td>
+              <td class="small">{{ a.created_at }}</td>
+              <td>
+                {% if a.attack_content %}
+                <button class="btn btn-link btn-sm p-0" type="button" data-bs-toggle="collapse" data-bs-target="#atk-{{ a.id }}">展开</button>
+                {% else %}-{% endif %}
+              </td>
+            </tr>
+            {% if a.attack_content %}
+            <tr class="collapse" id="atk-{{ a.id }}">
+              <td colspan="5" class="bg-light small"><pre class="mb-0 text-wrap" style="white-space:pre-wrap;max-height:200px;overflow:auto">{{ a.attack_content }}</pre></td>
+            </tr>
+            {% endif %}
+          {% else %}
+            <tr><td colspan="5" class="text-secondary p-3">未检测到明显攻击行为</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const buttons = document.querySelectorAll("[data-module]");
+    const panels = document.querySelectorAll(".module-panel");
+    function showModule(id) {
+      panels.forEach((p) => p.classList.toggle("active", p.id === "panel-" + id));
+      buttons.forEach((b) => b.classList.toggle("active", b.getAttribute("data-module") === id));
+      if (id === "protocol" && window.__resizeProtocol) window.__resizeProtocol();
+      if (id === "timeline" && window.__resizeTimeline) window.__resizeTimeline();
+      if (id === "ip" && window.__resizeIp) window.__resizeIp();
+      if (id === "security" && window.__resizeSec) window.__resizeSec();
+    }
+    buttons.forEach((btn) => {
+      btn.addEventListener("click", () => showModule(btn.getAttribute("data-module")));
+    });
+
+    const protocolData = {{ protocol_data|tojson }};
+    const timelineData = {{ timeline_data|tojson }};
+    const sessionHourData = {{ session_hour_data|tojson }};
+    const ipPairs = {{ ip_pairs|tojson }};
+    const attackStats = {{ attack_stats|tojson }};
+
+    const totalProto = protocolData.reduce((s, x) => s + x.value, 0) || 1;
+    const tbody = document.querySelector("#protocolStatsTable tbody");
+    protocolData.forEach((x) => {
+      const tr = document.createElement("tr");
+      const pct = ((100 * x.value) / totalProto).toFixed(2);
+      tr.innerHTML = "<td>" + x.name + "</td><td>" + x.value + "</td><td>" + pct + "%</td>";
+      tbody.appendChild(tr);
+    });
+
+    const protocolChart = echarts.init(document.getElementById("protocolChart"));
+    protocolChart.setOption({
+      tooltip: { trigger: "item", formatter: "{b}: {c} ({d}%)" },
+      legend: { bottom: 0, type: "scroll" },
+      series: [{ type: "pie", radius: ["40%", "68%"], avoidLabelOverlap: true, itemStyle: { borderRadius: 6 }, data: protocolData }]
+    });
+    window.__resizeProtocol = () => protocolChart.resize();
+
+    const vals = timelineData.values || [];
+    const timelineChart = echarts.init(document.getElementById("timelineChart"));
+    timelineChart.setOption({
+      tooltip: { trigger: "axis" },
+      grid: { left: "3%", right: "4%", bottom: "12%", containLabel: true },
+      xAxis: { type: "category", data: timelineData.labels, axisLabel: { rotate: vals.length > 12 ? 35 : 0 } },
+      yAxis: { type: "value", name: "包数" },
+      series: [{
+        type: "line",
+        smooth: true,
+        showSymbol: vals.length <= 24,
+        areaStyle: { opacity: 0.12 },
+        data: vals,
+        markPoint: vals.length ? {
+          symbol: "pin",
+          data: [
+            { type: "max", name: "峰值", itemStyle: { color: "#ef4444" } },
+            { type: "min", name: "低谷", itemStyle: { color: "#22c55e" } }
+          ]
+        } : undefined,
+        markLine: vals.length ? { data: [{ type: "average", name: "均值" }] } : undefined
+      }]
+    });
+
+    const sessionHourChart = echarts.init(document.getElementById("sessionHourChart"));
+    sessionHourChart.setOption({
+      tooltip: { trigger: "axis" },
+      grid: { left: "3%", right: "3%", bottom: "8%", containLabel: true },
+      xAxis: { type: "category", data: sessionHourData.labels },
+      yAxis: { type: "value", name: "包数" },
+      series: [{ type: "bar", data: sessionHourData.values, itemStyle: { color: "#6366f1", borderRadius: [4, 4, 0, 0] } }]
+    });
+    window.__resizeTimeline = () => { timelineChart.resize(); sessionHourChart.resize(); };
+
+    const nodeSet = new Set();
+    ipPairs.forEach((p) => { nodeSet.add(p.src_ip); nodeSet.add(p.dst_ip); });
+    const nodes = [...nodeSet].map((name) => ({ id: name, name, symbolSize: 18 + Math.min(22, ipPairs.filter((x) => x.src_ip === name || x.dst_ip === name).length) }));
+    const maxL = ipPairs.length ? Math.max(...ipPairs.map((x) => x.count)) : 1;
+    const links = ipPairs.slice(0, 40).map((p) => ({
+      source: p.src_ip,
+      target: p.dst_ip,
+      value: p.count,
+      lineStyle: { width: 1 + Math.round(8 * (p.count / maxL)), curveness: 0.15 }
+    }));
+    const ipGraphChart = echarts.init(document.getElementById("ipGraphChart"));
+    if (!nodes.length) {
+      ipGraphChart.setOption({
+        title: { text: "暂无 IP 间通信数据", left: "center", top: "middle", textStyle: { color: "#94a3b8", fontSize: 14 } }
+      });
+    } else {
+      ipGraphChart.setOption({
+        tooltip: {},
+        series: [{
+          type: "graph",
+          layout: "force",
+          roam: true,
+          draggable: true,
+          force: { repulsion: 280, edgeLength: [40, 120] },
+          label: { show: true, position: "right", formatter: "{b}", fontSize: 10 },
+          data: nodes,
+          links: links,
+          lineStyle: { color: "source", curveness: 0.15, opacity: 0.85 },
+          emphasis: { focus: "adjacency", lineStyle: { width: 4 } }
+        }]
+      });
+    }
+    window.__resizeIp = () => ipGraphChart.resize();
+
+    const attackTypeChart = echarts.init(document.getElementById("attackTypeChart"));
+    attackTypeChart.setOption({
+      tooltip: { trigger: "item" },
+      series: [{ type: "pie", radius: "65%", data: attackStats.by_type.length ? attackStats.by_type : [{ name: "无告警", value: 1 }], itemStyle: { borderRadius: 6 } }]
+    });
+    const attackRiskChart = echarts.init(document.getElementById("attackRiskChart"));
+    attackRiskChart.setOption({
+      tooltip: { trigger: "item" },
+      color: ["#dc2626", "#f59e0b", "#64748b"],
+      series: [{ type: "pie", radius: "65%", data: attackStats.by_risk.length ? attackStats.by_risk : [{ name: "无", value: 1 }], itemStyle: { borderRadius: 6 } }]
+    });
+    window.__resizeSec = () => { attackTypeChart.resize(); attackRiskChart.resize(); };
+
+    window.addEventListener("resize", () => {
+      protocolChart.resize();
+      timelineChart.resize();
+      sessionHourChart.resize();
+      ipGraphChart.resize();
+      attackTypeChart.resize();
+      attackRiskChart.resize();
+    });
+  })();
+</script>
+{% endblock %}
