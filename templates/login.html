@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,500;0,9..40,700;1,9..40,500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --ink: #0f172a;
+      --ink: #1e293b;
       --violet: #6366f1;
       --violet-dark: #4f46e5;
     }
@@ -18,11 +18,11 @@
       font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
       min-height: 100vh;
       margin: 0;
-      background: #0f172a;
+      background: #f8fafc;
       background-image:
-        radial-gradient(ellipse 120% 80% at 20% -20%, rgba(99, 102, 241, 0.45), transparent 50%),
-        radial-gradient(ellipse 80% 60% at 100% 50%, rgba(14, 165, 233, 0.2), transparent 45%),
-        radial-gradient(circle at 80% 100%, rgba(139, 92, 246, 0.25), transparent 40%);
+        radial-gradient(ellipse 120% 80% at 20% -20%, rgba(99, 102, 241, 0.12), transparent 50%),
+        radial-gradient(ellipse 80% 60% at 100% 50%, rgba(14, 165, 233, 0.1), transparent 45%),
+        radial-gradient(circle at 80% 100%, rgba(139, 92, 246, 0.08), transparent 40%);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -36,33 +36,35 @@
       gap: 0;
       border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.45);
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.1);
+      border: 1px solid #e2e8f0;
     }
     @media (max-width: 767px) {
       .auth-wrap { grid-template-columns: 1fr; }
       .auth-hero { min-height: 200px; padding: 28px !important; }
     }
     .auth-hero {
-      background: linear-gradient(145deg, #312e81 0%, #1e1b4b 50%, #0f172a 100%);
-      color: #e0e7ff;
+      background: linear-gradient(145deg, #eef2ff 0%, #e0e7ff 50%, #f8fafc 100%);
+      color: #334155;
       padding: 48px 40px;
       display: flex;
       flex-direction: column;
       justify-content: center;
       position: relative;
+      border-right: 1px solid #e2e8f0;
     }
     .auth-hero::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%236366f1' fill-opacity='0.06'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
       pointer-events: none;
     }
     .auth-hero h1 {
       font-size: 1.35rem;
       font-weight: 700;
       line-height: 1.45;
-      color: #fff;
+      color: var(--ink);
       position: relative;
       z-index: 1;
     }
@@ -72,7 +74,7 @@
       font-weight: 600;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: #a5b4fc;
+      color: var(--violet-dark);
       margin-bottom: 14px;
       position: relative;
       z-index: 1;
@@ -81,7 +83,7 @@
       margin: 16px 0 0;
       font-size: 0.92rem;
       line-height: 1.65;
-      opacity: 0.88;
+      color: #64748b;
       max-width: 28rem;
       position: relative;
       z-index: 1;
